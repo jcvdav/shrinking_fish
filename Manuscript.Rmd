@@ -1,0 +1,560 @@
+---
+title: \Large{Fished species exhibit latitudinal patterns in size structures along Baja California Peninsula}
+fontsize: 12pt
+output:
+  pdf_document:
+    fig_caption: yes
+    keep_tex: yes
+header-includes:
+- \usepackage{setspace}
+- \doublespacing
+- \usepackage{lineno}
+- \linenumbers
+- \usepackage{pdflscape}
+bibliography: references.bib
+# csl: huct.csl
+---
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { 
+      equationNumbers: { 
+            autoNumber: "all",
+            formatNumber: function (n) {return '9.'+n}
+      } 
+  }
+});
+</script>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+
+options(knitr.table.format = "latex")
+
+windowsFonts(Times=windowsFont("TT Times New Roman"))
+```
+
+
+**Authors**
+
+Juan Carlos Villaseñor-Derbez$^{1, 2}$, C. Gabriela Montaño-Moctezuma$^3$, Guillermo Torres-Moye$^1$, Antonio Trujillo-Ortiz$^1$, Arturo Ramírez-Valdez$^{1, 4}$
+
+**Adscriptions**
+
+  1. Facultad de Ciencias Marinas, Universidad Autónoma de Baja California, Km. 103 Carretera Tijuana-Ensenada, Ensenada, Baja California, México C.P. 22860
+  
+  2. Bren School of Environmental Science & Management, University of California Santa Barbara, Santa Barbara, CA
+  
+  3. Instituto de Investigaciones Oceanológicas, Universidad Autónoma de Baja California, Km. 103 Carretera Tijuana-Ensenada, Ensenada, Baja California, México C.P. 22860
+  
+  4. Scripps Institution of Oceanography, University of California San Diego, La Jolla, CA, USA
+
+
+**Corresponding Author**
+
+Juan Carlos Villaseñor-Derbez, (+1) 207 205 8435, jvillasenor@bren.ucsb.edu
+
+\clearpage
+
+# Abstract
+
+# Key words
+
+\clearpage
+
+# Introduction
+
+- Tallas son usadas frecuentemente en ciencia pesquera
+  - Tallas minimas de captura
+  - Calcular biomasa
+  - Modelos estructurados por tallas / edades
+
+- Tallas en ecologia
+  - Estructura de tallas puede indicar zonas de reclutamiento, agregaciones reproductivas
+  - Determinar el estatus de establecimiento de una poblacion
+  - Indicar diferencias en productividad (Jonno Wilson)
+  - Size is a determinant of age and fecundity and egg quality
+
+Kelp forests along the Eastern Pacific coast are seen as transboundary resources [@torresmoye_2013-mx], and are subject to different regulations on either side of the U.S. - Mexico border [@ramrezvaldez_2017-RH]. Furthermore, resources associated to kelp forests on Mexican coasts have received little attention when compared to their homologous across the border [@ramrezvaldez_2017-RH]. 
+
+Thus, the only available information about size structures for fish populations comes from landing reports that do not necessarily reflect the composition and state of populations as the indicators (e.g. size structure) may be biased by the interests of fisheries operating in each region (Essington et al., 2006). This lack of information impairs decision making and disables the implementation of correct management strategies.
+
+Given the importance of size structures of fish populations, we discribe size structures of the most abundant fish species along Baja California.
+
+**Specifically, we compared size structures, fish size, and proportion of potentially mature organisms of fish populations under different degrees of anthropogenic pressure. This study represents the first approach to comprehensively assess fish size-structures and densities along the Mexican kelp forests through visual censuses and that did not rely on landing data.**
+
+
+```{r, warning = F}
+suppressPackageStartupMessages({
+  library(ggjoy)
+  library(sp)
+  library(sf)
+  library(tmap)
+  library(rgdal)
+  library(raster)
+  library(maptools)
+  library(tmaptools)
+  library(MPAtools)
+  library(magrittr)
+  library(tidyverse)
+})
+
+source('~/GitHub/bvi/bvi.R')
+```
+
+
+```{r load data}
+length_data <- read.csv("./Data/Tidy/Peces_KelpForest_2011-2013.csv", stringsAsFactors = F) %>%
+  dplyr::select(ID,
+                Site,
+                Zone,
+                Latitude,
+                Longitude,
+                KelpDensity,
+                Level,
+                Transect,
+                GenusSpecies,
+                TotalLength,
+                Abundance,
+                aTL2TW,
+                bTL2TW,
+                TrophicLevel,
+                Lm,
+                Lmax,
+                Lm,
+                everything()) %>%
+  mutate(PriceCateg2 = ifelse(GenusSpecies %in% c("Chromis punctipinnis", "Rhacochilus vacca", "Rhacochilus toxotes", "Medialuna californiensis", "Brachyistius frenatus", "Embiotoca jacksoni", "Hypsypops rubicundus"), "low", PriceCateg)) %>% 
+  filter(!Location %in% c("ICO"), Year == 2013)
+
+```
+
+
+# Methods
+
+## Area of study
+
+The present study took place in the kelp forests off the coasts of Baja California, Mexico (Fig. 1). 
+
+Fishing has been recognized as one of the most important sources of pressure exerted on kelp forests (Shroeder & Love, 2002; Coleman et al., 2003). For the area of study, an average sport-fishing trip may yield a catch of 19 organisms, equivalent to 54 Kg (Sosa-Nishizaki et al., 2013).
+
+Human population is unequally distributed along Baja California. The larger cities on the Pacific coast of the state (Tijuana and Ensenada) are located in the north, and there are vast unpopulated areas towards the south. Fishing pressure (commercial and artisanal) is heterogeneously distributed, with some major fishing grounds in front of the large cities, but also some important areas south, in small towns. Nevertheless, due to its proximity to the United States, and mainland Mexico, there is also a higher availability of sport fishing activities in the northern region, particularly in Ensenada and San Quintín (Sosa-Nishizaki et al., 2013). Thus, we believe that an uneven distribution of anthropogenic pressure exists in the Pacific coast of Baja California, where the densely populated northern regions induce a higher stress on the marine environment than small settlements in the southern part of the state.
+
+```{r, message = F, warning = F}
+proj <- CRS("+proj=longlat +datum=NAD27")
+
+# baja <- readOGR(dsn = "./Data/Spatial", layer = "muni_2015gw", verbose = F)
+# 
+# baja$COUNTRY <- "Mexico"
+# baja2 <- unionSpatialPolygons(baja, baja$COUNTRY)
+# 
+
+load("./Data/Spatial/coastline_mx.Rda")
+
+proj2 <- CRS(proj4string(baja2))
+
+#Small shapefile for region of interest
+region <- data.frame(X = c(-117.5, -114.5, -114.5, -117.5), Y = c(29.5, 29.5, 32.5, 32.5)) %>% 
+  Polygon() %>% 
+  list() %>% 
+  Polygons(ID = 1) %>% 
+  list() %>% 
+  SpatialPolygons(proj4string = proj2)
+
+# Labes for first map
+labels1 <- data.frame(X = c(-106, -104, -112), Y = c(35, 26, 20), Label = c("U.S.A.", "Mexico", "Pacific Ocean"))
+coordinates(labels1) <- c("X", "Y")
+proj4string(labels1) <- proj2
+labels1 <- spTransform(labels1, proj2)
+
+# Labes for second map
+labels2 <- data.frame(X = c(-115.75, -115.75, -117), Y = c(31.5, 31.25, 30.5), Label = c("Baja California", "Peninsula", "Pacific Ocean"))
+coordinates(labels2) <- c("X", "Y")
+proj4string(labels2) <- proj2
+labels2 <- spTransform(labels2, proj2)
+
+#convert the spatial points in length data to shapefile
+xy1 <- group_by(length_data, Site, Longitude, Latitude) %>% 
+  count()
+
+xy <- data.frame(X = xy1$Longitude, Y = xy1$Latitude)
+coordinates(xy) <- c("X", "Y")
+proj4string(xy) <- proj2  ## for example
+res <- spTransform(xy, proj2)
+sites <- SpatialPointsDataFrame(coords = res, data = xy1, proj4string = proj2)
+
+# Maps
+data(World)
+W <- spTransform(World, proj)
+W <- W[W$name %in% c("United States"),]
+
+pen_map <- tm_shape(W, bbox = bb(xlim = c(-118, -95), ylim = c(17.5, 33))) +
+  tm_polygons() +
+  tm_shape(baja2) +
+  tm_polygons() +
+  tm_shape(region) +
+  tm_polygons(alpha = 0, border.col = "red", lwd = 2) +
+  tm_shape(labels1) +
+  tm_text("Label") +
+  tm_scale_bar(position = c("left", "bottom"))
+
+study_area <- tm_shape(W, bbox = bb(xlim = c(-117.5, -114.5), ylim = c(29.5, 32.5))) +
+  tm_polygons(border.col = "black") +
+  tm_shape(baja2) +
+  tm_polygons() +
+  tm_shape(labels2) +
+  tm_text("Label")+
+  tm_shape(sites) +
+  tm_bubbles(size = 0.15, border.col = "black", col = "black", shape = 20) +
+  tm_compass(position = c("left", "bottom")) +
+  tm_scale_bar(position = c("left", "bottom"))
+
+tmap_arrange(pen_map, study_area, outer.margins = 0.005, ncol = 2)
+```
+
+```{r}
+library(raster)
+
+rasters <- paste0("./Data/Temp/", list.files(path = "./Data/Temp/", pattern = "MWOI"))
+
+xy1 <- group_by(length_data, Location, Longitude, Latitude) %>% 
+  count() %>% 
+  ungroup()
+
+xy <- data.frame(X = xy1$Longitude-1, Y = xy1$Latitude)
+coordinates(xy) <- c("X", "Y")
+proj4string(xy) <- proj2  ## for example
+res <- spTransform(xy, proj2)
+
+
+year_months <- expand.grid(2009:2013, month.abb) %>% 
+  mutate(YM = paste(Var1, Var2, sep = "-")) %$%
+  YM %>% 
+  as.character()
+
+Temp <-  stack(rasters) %>% 
+  raster::extract(res) %>% 
+  matrix(nrow = length(unique(length_data$Location)), byrow = F) %>% 
+  set_colnames(year_months[1:59]) %>% 
+  as.data.frame() %>% 
+  cbind(xy1) %>% 
+  gather(Date, Temp, -c(Location, Longitude, Latitude, n))
+
+Temp_year <- group_by(Temp, Location) %>% 
+  summarize(Temp = mean(Temp))
+
+```
+
+```{r}
+
+W2 <- spTransform(World, proj)
+
+eez <- sf::st_read(dsn = "./Data/Spatial", layer = "contdv250_zeemgw", quiet = T, stringsAsFactors = F) %>% 
+  st_union(by_feature = T) %>% 
+  st_sf(geometry = .)
+
+Temp <-  stack(rasters) %>% 
+  mask(mask = raster(rasters[1])>100, maskvalue = T) %>% 
+  crop(as(eez, "Spatial")) %>% 
+  calc(fun=function(x){mean(x, na.rm=T)})
+
+plot(Temp)
+contour(Temp, add = T)
+plot(W2, add = T, col = "gray")
+plot(baja2, add = T, col = "gray")
+
+```
+
+
+## Sampling
+
+During October and November 2013 we visited `r length(unique(length_data$Location))` locations distributed along 291 Km of coastline off the Pacific coasts of Baja California, Mexico (Fig. 1, Table I). Trained scuba divers assessed fish communities through visual censuses along 30 × 2 m belt transects. On each transect, we registered species richness, abundances, and total lengths, in 5 cm intervals. We performed a total of 133 belt transects, accounting for a total surveyed area of 7,980 m^2^. Individual divers were randomized between survey groups for each sampling event in order to reduce bias (Sandin et al., 2008).
+
+```{r}
+length_data %>% 
+  filter(Transect > 0) %>% 
+  group_by(Location, Site, Level, Latitude, Longitude, Transect) %>% 
+  summarize(n = n()) %>% 
+  group_by(Location, Level) %>% 
+  summarize(Latitude = mean(Latitude),
+            Longitude = mean(Longitude),
+            Transects = n()) %>% 
+  spread(Level, Transects) %>% 
+  knitr::kable(format = "latex", booktabs = T) %>% 
+  kableExtra::kable_styling()
+```
+
+## Data analysis
+
+Id abundant species w IVB
+    
+```{r}
+abundant_spp <- filter(length_data, Transect > 0) %>%
+  group_by(Location, Site, Level, Transect, GenusSpecies) %>%
+  summarize(n = sum(Abundance)) %>%
+  mutate(D = n / 60) %>%
+  select(-n) %>% 
+  spread(Location, D, fill = 0) %>%
+  gather(Location, D,-c(Site, Level, Transect, GenusSpecies)) %>%
+  group_by(Location, GenusSpecies) %>%
+  summarize(D = mean(D)) %>%
+  ungroup() %>% 
+  select(Location, GenusSpecies, D) %>%
+  spread(Location, D) %>%
+  rename(Spp = GenusSpecies) %>% 
+  bvi(sum = T, others = T)
+```
+
+```{r}
+my_species <- length_data %>% 
+  filter(Transect > 0,
+         GenusSpecies %in% abundant_spp$Spp[1:8]) %>% 
+  reshape::untable(num = .$Abundance) %>% 
+  mutate(Abundance = 1,
+         Fished = ifelse(GenusSpecies %in% c("Paralabrax clathratus", "Semicossyphus pulcher", "Sebastes atrovirens", "Caulolatilus princeps", "Ophiodon elongatus", "Hypsypops rubicundus", "Seriola lalandi", "Paralabrax nebulifer", "Sphyraena argentea"), T, F)) %>% 
+  left_join(Temp_year, by = "Location")
+```
+
+```{r}
+group_by(my_species, Location, Site, Level, Transect, Latitude, KelpDensity, Temp) %>% 
+  summarize(n()) %>% 
+  ungroup() %>% 
+  select(Latitude, Kelp = KelpDensity, Temperature = Temp) %>% 
+  cor() %>% 
+  corrplot::corrplot(method = "ellipse", type = "lower", bg = "transparent", diag = F, outline = T, addCoef.col = "black")
+```
+
+
+$$TL_{i,j} = \beta_{0i}Species_i + \beta_1 Latitude_j + \beta_2 Latitude_j \times Fished_i + \epsilon$$
+
+$$TL_{i,j} = \beta_{0i}Species_i + \beta_1 Latitude_j + \beta_2 Latitude_j \times Fished_i + \beta_3Kelp_j + \epsilon$$
+
+$$TL_{i,j} = \beta_{0i}Species_i + \beta_1 Latitude_j + \beta_2 Latitude_j \times Fished_i + \beta_3Habitat_j + \epsilon$$
+
+$$TL_{i,j} = \beta_{0i}Species_i + \beta_1 Latitude_j + \beta_2 Latitude_j \times Fished_i + \beta_3Temp_j + \epsilon$$
+
+$$TL_{i,j} = \beta_{0i}Species_i + \beta_1 Latitude_j + \beta_2 Latitude_j \times Fished_i + \beta_3Kelp_j + \beta_4Habitat_j + \beta_5Temp_j + \epsilon$$
+
+- $i$ = Species
+
+- $j$ = Transect?
+
+```{r}
+model1 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + Latitude:Fished - 1, data = my_species)
+
+model2 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + Latitude:Fished + KelpDensity - 1, data = my_species)
+
+model3 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + Latitude:Fished + Level - 1, data = my_species)
+
+model4 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + Latitude:Fished + Temp -1 , data = my_species)
+
+model5 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + KelpDensity + Level + Temp -1 , data = my_species)
+
+model6 <- lm(formula = TotalLength ~ GenusSpecies + Latitude + KelpDensity + Level + Temp + Latitude:Fished -1 , data = my_species)
+
+```
+
+
+\clearpage
+
+# Results
+
+```{r}
+dplyr::select(abundant_spp, Species = Spp, BVI, rBVI) %>% 
+  mutate(cBVI = cumsum(rBVI),
+         cBVI = ifelse(cBVI > 100, NA, cBVI)) %>% 
+  knitr::kable(digits = 2, booktabs = T, caption = "Biological value index for 16 fish species along the Kelp Forests of Baja California. BVI = Biological Value Index, rBVI = Relative Biological Value Index, cBVI = Cummulative Biological Value Index.") %>% 
+  kableExtra::kable_styling() %>% 
+  kableExtra::column_spec(column = 1, italic = T)
+```
+
+
+```{r, fig.width = 7, fig.height = 6, fig.cap = "Mean total length by transect as a function of latitude. Marker color indicates habitat (B = bottom, M = midwater), marker size indicates Kelp Density (Fronds / m2)."}
+my_species %>% 
+  group_by(Fished, Location, Site, Latitude, Level, KelpDensity, Transect, GenusSpecies) %>% 
+  summarize(mTL = mean(TotalLength),
+            D = sum(Abundance)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = Latitude, y = mTL, size = KelpDensity, color = Fished)) +
+  geom_smooth(color = "black", method = "lm", size = 1, linetype = "dashed", se = F) +
+  geom_point(alpha = 0.25, aes(shape = Level)) +
+  facet_wrap(~GenusSpecies, scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "transparent"),
+        strip.text = element_text(face = "italic", size = 8)) +
+  guides(size = guide_legend(title="Kelp Density\n(Fronds / m2)"),
+         color = guide_legend(title = "Habitat")) +
+  scale_x_continuous(breaks = c(30, 31, 32)) +
+  labs(x = "°Latitude", y = "mean TL (cm)") +
+  ggtitle("Mean Length vs Latitude")
+```
+
+
+```{r}
+robust_se <- function(model){
+  
+  RSE <- model %>%
+    lmtest::coeftest(vcov = sandwich::vcovHC(., type = "HC1")) %>%
+    broom::tidy()
+  
+  return(RSE$std.error)
+}
+
+F_string <- function(model){
+
+  F_results <- model %>% 
+    lmtest::waldtest(vcov = sandwich::vcovHC(., type = "HC1")) %>% 
+    broom::tidy() %>% 
+    filter(!is.na(df)) %>% 
+    mutate(p1 = ifelse(p.value <= 0.1, "*", ""),
+           p2 = ifelse(p.value <= 0.05, "*", ""),
+           p3 = ifelse(p.value <= 0.01, "*", ""),
+           p = paste0(p1, p2, p3),
+           stat = formatC(x = statistic, digits = 1, format = "f", big.mark = ","),
+           df2 = formatC(x = res.df+df, digits = 1, format = "d", big.mark = ","),
+           string = paste0(stat, p, " (df = ", -df, "; ", df2, ")")) %$%
+    string
+  
+  return(F_results)
+  
+}
+```
+
+
+\begin{landscape}
+
+```{r, results = 'asis'}
+se_list <- list(model1 = robust_se(model1),
+                model2 = robust_se(model2),
+                model3 = robust_se(model3),
+                model4 = robust_se(model4),
+                model5 = robust_se(model5),
+                model6 = robust_se(model6))
+
+Add_lines <- list(c("F",
+                    F_string(model1),
+                    F_string(model2),
+                    F_string(model3),
+                    F_string(model4),
+                    F_string(model5),
+                    F_string(model6)),
+                  c("AIC",
+                    formatC(x = AIC(model1), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = AIC(model2), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = AIC(model3), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = AIC(model4), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = AIC(model5), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = AIC(model6), digits = 2, format = "f", big.mark = ",")),
+                  c("BIC",
+                    formatC(x = BIC(model1), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = BIC(model2), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = BIC(model3), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = BIC(model4), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = BIC(model5), digits = 2, format = "f", big.mark = ","),
+                    formatC(x = BIC(model6), digits = 2, format = "f", big.mark = ",")))
+
+stargazer::stargazer(model1,
+                     model2,
+                     model3,
+                     model4,
+                     model5,
+                     model6,
+                     column.labels = c("Model 1", "Model 2", "Model 3", "Model 4", "Model5", "Model6"),
+                     digits = 3,
+                     se = se_list,
+                     p.auto = T,
+                     type = "latex",
+                     omit.stat = "f",
+                     keep.stat = c("n", "rsq"),
+                     single.row = T,
+                     header = F, font.size = "tiny",
+                     add.lines = Add_lines,
+                     dep.var.labels = c("Length (cm)"),dep.var.caption = "",
+                     intercept.bottom = F,
+                     out = "RegTable.html", model.numbers = F,
+                     covariate.labels = c("C. punctipinnis", "E. jacksoni", "H. rubicundus", "O. californica", "P. clathratus", "R. vacca", "S. atrovirens", "S. pulcher", "Latitude", "Kelp", "Habitat", "Temperature", "Latitude*Fished"))
+```
+
+\end{landscape}
+
+\clearpage
+
+# Discusion and Conclusion
+
+Removing organisms of specific sizes (*i. e.* size-selective harvesting) is a common practice in marine and terrestrial ecosystems (Fenberg & Roy, 2008). Commercial fisheries often focus their efforts on large--sized organisms within a same species which yields a greater revenue--effort ratio (Hepell et al., 2005; Hamilton et al., 2007). Trophy--fishing follows the same pattern; larger fish represent a greater challenge and thus produce more satisfaction when captured (Shroeder & Love, 2002). Size--selective harvesting can also be market--driven when buyers have a preferred size, typically medium-sized or “dish-sized” fish that can be better allocated in the market (Reddy et al., 2013 / Aburto).
+
+Fishing pressure (especially when size-selective) can modify life histories of fishes (McBride et al., 2013).  For example, Thompson & Stokes (1996) demonstrated how different fishing methods targeting different sizes produced different size structures on Atlantic cod (*Gadus morhua*) populations by non-randomly distributing mortality.
+
+\clearpage
+
+# References
+
+<div id = "refs"></div>
+
+# Other figures
+
+```{r, eval = F}
+Temp <-  stack(rasters) %>% 
+  mask(mask = raster(rasters[1])>100, maskvalue = T) %>% 
+  crop(as(eez, "Spatial")) %>% 
+  calc(fun=function(x){sd(x, na.rm=T)})
+
+plot(Temp, main = "Standard deviaion of Temperature")
+contour(Temp, add = T)
+plot(eez, add = T)
+```
+ 
+```{r}
+my_species %>% 
+  group_by(Fished, Location, Site, Level, Latitude, KelpDensity, Transect, GenusSpecies) %>% 
+  summarize(mTL = mean(TotalLength),
+            D = sum(Abundance)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = KelpDensity, y = mTL, color = Level)) +
+  geom_smooth(method = "lm", color = "black", size = 1, linetype = "dashed", se = F) +
+  geom_point(alpha = 0.25) +
+  facet_wrap(~GenusSpecies, scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "transparent"),
+        strip.text = element_text(face = "italic", size = 6)) +
+  guides(color = guide_legend(title = "Fished")) +
+  labs(x = "Kelp Density (Fronds / m2)", y = "mean TL (cm)") +
+  ggtitle("Mean Length vs Kelp Density")
+```
+
+```{r}
+my_species %>% 
+  group_by(Fished, Location, Site, Level, Latitude, Temp, Transect, GenusSpecies) %>% 
+  summarize(mTL = mean(TotalLength),
+            D = sum(Abundance)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = Temp, y = mTL, color = Level)) +
+  geom_smooth(method = "lm", color = "black", size = 1, linetype = "dashed", se = F) +
+  geom_point(alpha = 0.25) +
+  facet_wrap(~GenusSpecies, scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "transparent"),
+        strip.text = element_text(face = "italic", size = 6)) +
+  guides(color = guide_legend(title = "Fished")) +
+  labs(x = "Temperature (°C)", y = "mean TL (cm)") +
+  ggtitle("Mean Length vs Temperature")
+```
+
+```{r, fig.height = 8, fig.width = 6.5}
+my_species %>% 
+  group_by(Fished, Location, Site, Level, Latitude, KelpDensity, Transect, GenusSpecies) %>%
+  summarize(max = max(TotalLength),
+            med = median(TotalLength),
+            avg = mean(TotalLength),
+            min = min(TotalLength)) %>%
+  gather(Measure, Value, -c(Fished, Location, Site, Level, Latitude, KelpDensity, Transect, GenusSpecies)) %>% 
+  ggplot(aes(x = Latitude, y = Value, color = Level)) +
+  geom_smooth(method = "lm", size = 1, linetype = "dashed", se = F) +
+  geom_point(alpha = 0.25) +
+  facet_grid(GenusSpecies~Measure, scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_rect(fill = "transparent"),
+        strip.text = element_text(face = "italic", size = 6)) +
+  guides(color = guide_legend(title = "Fished")) +
+  scale_x_continuous(breaks = c(30, 31, 32)) +
+  labs(x = "°Latitude", y = "mean TL (cm)") +
+  ggtitle("Length descriptions vs Latitude")
+```
